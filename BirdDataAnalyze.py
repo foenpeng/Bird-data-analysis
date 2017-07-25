@@ -4,17 +4,17 @@ import numpy as np
 import peakutils
 import matplotlib.pyplot as plt
 from peakutils.plot import plot as pplot
-from scipy.signal import butter, lfilter
-from scipy.signal import freqz
-from scipy import stats
-from scipy import integrate
+from scipy.signal import butter, lfilter, freqz
+from scipy import stats, integrate
+
 
 accel_vol = 9.8/12 #9.8 kg/s^2 per 12 voltage value changes
 sample_freq = 1000 # Hz
 PeakThreshold = 9.8*3 # the threshold for peak detection
-NectarThreshold = 0.3
+NectarThreshold = 0.1
 Dist = 10 #the minnimum distance between two peaks for accelerometer
-NectarDist = 20
+NectarDist = 50
+MinTimeEngagement = 500
 
 morph = "a0A60c-1C4"
 #morph = str(raw_input("Which morphology is it?\n")) + "l070r1.5R025v020p000"
@@ -46,13 +46,13 @@ for item in trial_dir:
         visit_write = csv.writer(visit_file, delimiter=',', lineterminator='\n')
         
         # find all the nectar empty events
-        empty_time = []
-        fill_time = []
+        
         e_data=[]
         for row in e_read:
             e_data.append([int(row[0]),float(row[1])])
         
         # check if  e_data is correct. 
+        empty_time = []
         for i in range(0,len(e_data)-1):
             if e_data[i][0] == 0: 
                 empty_time.append(round(float(e_data[i][1]),2))
@@ -109,7 +109,7 @@ for item in trial_dir:
         
         
         visit_num =  len(visit_time)
-        visit_write.writerow(["trial_name", "trial_number", "visit_number",'visit_start', 'nectar_empty', 'visit_end', 'start_empty', 'start_end', 'hit_count', 'lick_count', 'hit/lick'])
+        visit_write.writerow(["trial_name", "trial_number", "visit_number",'visit_start', 'nectar_empty', 'visit_end', 'start_empty', 'start_end', 'hit_count', 'lick_count', 'engagement_number', 'hit_engagement', 'lick_engagement'])
         visit_count = 0
         
         lick_count_all = []
@@ -122,18 +122,28 @@ for item in trial_dir:
          
             accel_visit = np.sqrt((np.power(accel_raw[0,xyz_index],2) + np.power(accel_raw[1,xyz_index],2) + np.power(accel_raw[2,xyz_index],2))) 
             hit_count = peakutils.indexes(accel_visit, thres=PeakThreshold /max(accel_visit), min_dist=Dist)
-            #pplot(t_visit,accel_visit,hit_count)
+            pplot(t_visit,accel_visit,hit_count)
             #plt.show()
             
             n_visit = n[xyz_index] - stats.mode(n[xyz_index])[0]
             lick_count = peakutils.indexes(n_visit, thres=NectarThreshold, min_dist=NectarDist)
             lick_count_all.append(lick_count)
-            #pplot(t_visit,n_visit,lick_count)
+            pplot(t_visit,n_visit,lick_count)
             #plt.show()
-            
-            this_visit = [trial_folder, trial_count, visit_count, visit[0],visit[1],visit[2], visit[1]-visit[0], visit[2]-visit[0], len(hit_count), len(lick_count), np.float64(len(hit_count))/np.float64(len(lick_count))]
-            visit_info.append(this_visit)
-            visit_write.writerow(this_visit)
+
+            indices = [(x + y) // 2 for (x, y, i) in zip(lick_count, lick_count[1:], range(len(lick_count))) if MinTimeEngagement < abs(x - y)]
+            lick_count_binned = np.histogram(lick_count, [0] + indices + [xyz_end-xyz_start])[0]
+            hit_count_binned = np.histogram(hit_count, [0] + indices + [xyz_end-xyz_start])[0]
+            #print(t_visit[indices])
+            #print(len(hit_count_binned))
+
+ 
+            engagement_count = 0
+            for i,value in enumerate(hit_count_binned):
+                engagement_count += 1
+                this_visit = [trial_folder, trial_count, visit_count, visit[0],visit[1],visit[2], visit[1]-visit[0], visit[2]-visit[0], len(hit_count), len(lick_count), engagement_count, hit_count_binned[i], lick_count_binned[i]]
+                visit_info.append(this_visit)
+                visit_write.writerow(this_visit)
 
         array = np.array(visit_info)
         e_file.close()
@@ -142,15 +152,13 @@ for item in trial_dir:
         y_file.close()
         z_file.close()
         visit_file.close()
-        
-        
-        
+
         #break
 
 os.chdir(morph_path)
 with open(("{0}.csv").format(morph), "w") as morph_file:
     morph_write = csv.writer(morph_file,delimiter=',', lineterminator='\n')
-    morph_write.writerow(["trial_name", "trial_number", "visit_number", 'visit_start', 'nectar_empty', 'visit_end', 'start_empty', 'start_end', 'hit_count', 'lick_count', 'hit/lick'])
+    morph_write.writerow(["trial_name", "trial_number", "visit_number", 'visit_start', 'nectar_empty', 'visit_end', 'start_empty', 'start_end', 'hit_count', 'lick_count', 'engagement_number', 'hit_engagement', 'lick_engagement'])
     
     for item in visit_info:
         morph_write.writerow(item)
