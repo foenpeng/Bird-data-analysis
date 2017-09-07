@@ -6,17 +6,33 @@ import matplotlib.pyplot as plt
 from peakutils.plot import plot as pplot
 from scipy.signal import butter, lfilter, freqz
 from scipy import stats, integrate
+from scipy.signal import butter, lfilter
 
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+    
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
 
 accel_vol = 9.8/12 #9.8 kg/s^2 per 12 voltage value changes
 sample_freq = 1000 # Hz
 PeakThreshold = 9.8*3 # the threshold for peak detection
-NectarThreshold = 0.1
+NectarThreshold = 0.6
 Dist = 10 #the minnimum distance between two peaks for accelerometer
 NectarDist = 50
 MinTimeEngagement = 500
+# the followings are for signal filter
+lowcut = 1
+highcut = 20
+fs = 1000
 
-morph = "a0A60c-1C4"
+morph = "a0A60c-3C3"
 #morph = str(raw_input("Which morphology is it?\n")) + "l070r1.5R025v020p000"
 morph_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),morph)
 trial_dir = os.listdir(morph_path)
@@ -67,6 +83,7 @@ for item in trial_dir:
         for row in n_read:
             n.append([float(row[0]), float(row[1])])
         n = np.array(n)[:,0]
+        n = butter_bandpass_filter(n, lowcut, highcut, fs, order=3)
         
         x = []
         for row in x_read:
@@ -122,13 +139,14 @@ for item in trial_dir:
          
             accel_visit = np.sqrt((np.power(accel_raw[0,xyz_index],2) + np.power(accel_raw[1,xyz_index],2) + np.power(accel_raw[2,xyz_index],2))) 
             hit_count = peakutils.indexes(accel_visit, thres=PeakThreshold /max(accel_visit), min_dist=Dist)
-            pplot(t_visit,accel_visit,hit_count)
+            #pplot(t_visit,accel_visit,hit_count)
             #plt.show()
             
-            n_visit = n[xyz_index] - stats.mode(n[xyz_index])[0]
+            #n_visit = n[xyz_index] - stats.mode(n[xyz_index])[0]
+            n_visit = n[xyz_index]
             lick_count = peakutils.indexes(n_visit, thres=NectarThreshold, min_dist=NectarDist)
             lick_count_all.append(lick_count)
-            pplot(t_visit,n_visit,lick_count)
+            #pplot(t_visit,n_visit,lick_count)
             #plt.show()
 
             indices = [(x + y) // 2 for (x, y, i) in zip(lick_count, lick_count[1:], range(len(lick_count))) if MinTimeEngagement < abs(x - y)]
