@@ -53,7 +53,7 @@ morph_list = ["a0A60c-1C3",
               "a0A60c-3C0",
               "a0A60c-3C3",
               "a0A60c-3C4"]
-#morph_list = ["a0A60c-1C0"]
+morph_list = ["a0A60c-1C0"]
 morph_list = ["test"]
 program_start_time = time.time()
 #morph = str(raw_input("Which morphology is it?\n")) + "l070r1.5R025v020p000"
@@ -167,7 +167,7 @@ for morph in morph_list:
                 if (j-1)-i > 2:
                     num_frames = j-1-i
                     bird_mean = np.mean(bird_info[i+1:j,2:], axis=0)
-                    visit_time = [bird_info[i+1,1], bird_info[j-1,1],num_frames,sum(bird_info[i+1:j,-1])] + bird_mean.tolist()
+                    visit_time = [bird_info[i+1,1], bird_info[j,1],num_frames,sum(bird_info[i+1:j,-1])] + bird_mean.tolist()
                     visits.append(visit_time)
                     #print(bird_info[i+1:j,3])
                     #print(visit_time)
@@ -199,8 +199,9 @@ for morph in morph_list:
                 #pplot(t_visit,accel_visit,hit_count)
                 #plt.show()
                 
-                # reduce high frequency noise and get rid of super low values, then smooth the flat top peaks
-                n_visit = n[xyz_index] - stats.mode(n[xyz_index])[0]
+                # reduce high frequency noise and get rid of super low values, then smooth the flat top peaks. Use 1% percentile instead of mode or median.
+                n_visit = n[xyz_index] - stats.scoreatpercentile(n[xyz_index],1,interpolation_method='higher')
+                plt.plot(t_visit,n[xyz_index])
                 n_visit[n_visit<2] = 0
                 n_visit = smooth(n_visit, window_len=51)
                 #n_visit = n[xyz_index]
@@ -210,7 +211,8 @@ for morph in morph_list:
                     lick_count = peakutils.indexes(n_visit, thres=NectarThreshold/max(n_visit), min_dist=NectarDist)
      
                 #plt.figure(2)
-                #pplot(t_visit,n_visit[0:-50],lick_count)
+                #print(lick_count)
+                #pplot(t_visit,n_visit[0:-50],lick_count[0:-1])
                 #plt.show()
 
                 this_visit = [trial_folder, trial_count, visit_count,len(hit_count), len(lick_count), visit[1]-visit[0]] + visit
